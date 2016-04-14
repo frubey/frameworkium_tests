@@ -5,6 +5,7 @@ import com.frameworkium.config.DriverSetup;
 import com.frameworkium.config.DriverType;
 import com.frameworkium.config.WebDriverWrapper;
 import com.frameworkium.listeners.*;
+import com.frameworkium.pages.internal.SuppressBrowserLoad;
 import com.frameworkium.reporting.AllureProperties;
 import com.saucelabs.common.SauceOnDemandAuthentication;
 import com.saucelabs.common.SauceOnDemandSessionIdProvider;
@@ -47,30 +48,39 @@ public abstract class BaseTest implements SauceOnDemandSessionIdProvider, SauceO
      *  - Initialise the screenshot capture
      *  - Configure the browser based on parameters (maximise window, session resets, user agent)
      */
-    @BeforeSuite(alwaysRun = true)
-    public static void instantiateDriverObject() {
-        driverType = new ThreadLocal<DriverType>() {
-            @Override
-            protected DriverType initialValue() {
-                DriverType driverType = new DriverSetup()
-                        .returnDesiredDriverType();
-                driverType.instantiate();
-                activeDriverTypes.add(driverType);
-                return driverType;
-            }
-        };
-        requiresReset = new ThreadLocal<Boolean>() {
-            @Override
-            protected Boolean initialValue() {
-                return Boolean.FALSE;
-            }
-        };
-        capture = new ThreadLocal<ScreenshotCapture>() {
-            @Override
-            protected ScreenshotCapture initialValue() {
-                return null;
-            }
-        };
+    @BeforeMethod(alwaysRun = true)
+    public static void instantiateDriverObject(Method testMethod) {
+
+        boolean suppressLoad = false;
+        try {
+            suppressLoad = testMethod.getAnnotation(SuppressBrowserLoad.class).value();
+        } catch (Exception e) {}
+
+        if(!suppressLoad) {
+            driverType = new ThreadLocal<DriverType>() {
+                @Override
+                protected DriverType initialValue() {
+                    DriverType driverType = new DriverSetup()
+                            .returnDesiredDriverType();
+                    driverType.instantiate();
+                    activeDriverTypes.add(driverType);
+                    return driverType;
+                }
+            };
+            requiresReset = new ThreadLocal<Boolean>() {
+                @Override
+                protected Boolean initialValue() {
+                    return Boolean.FALSE;
+                }
+            };
+            capture = new ThreadLocal<ScreenshotCapture>() {
+                @Override
+                protected ScreenshotCapture initialValue() {
+                    return null;
+                }
+            };
+        configureBrowserBeforeTest(testMethod);
+        }
     }
 
     /**
@@ -82,14 +92,13 @@ public abstract class BaseTest implements SauceOnDemandSessionIdProvider, SauceO
      *
      * @param testMethod - The test method name of the test
      */
-    @BeforeMethod(alwaysRun = true)
     public static void configureBrowserBeforeTest(Method testMethod) {
-        try {
-            configureDriverBasedOnParams();
-            initialiseNewScreenshotCapture(testMethod);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+            try {
+                configureDriverBasedOnParams();
+                initialiseNewScreenshotCapture(testMethod);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
     }
 
     /**
