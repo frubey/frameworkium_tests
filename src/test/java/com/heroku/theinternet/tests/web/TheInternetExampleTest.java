@@ -1,5 +1,6 @@
 package com.heroku.theinternet.tests.web;
 
+import com.frameworkium.pages.internal.SuppressBrowserLoad;
 import ru.yandex.qatools.allure.annotations.Issue;
 
 import com.frameworkium.tests.internal.BaseTest;
@@ -12,6 +13,7 @@ public class TheInternetExampleTest extends BaseTest {
 
     @Test
     @Issue("TEST-1")
+    //@SuppressBrowserLoad
     public void smokeTest() {
 
         assertThat(WelcomePage.open().then().getTitle()).isEqualTo("The Internet");
