@@ -1,29 +1,40 @@
 package com.frameworkium.core.ui.tests;
 
-import com.frameworkium.core.common.listeners.*;
+import com.frameworkium.core.common.listeners.MethodInterceptor;
+import com.frameworkium.core.common.listeners.ResultLoggerListener;
+import com.frameworkium.core.common.listeners.TestListener;
 import com.frameworkium.core.common.reporting.TestIdUtils;
 import com.frameworkium.core.common.reporting.allure.AllureLogger;
 import com.frameworkium.core.common.reporting.allure.AllureProperties;
 import com.frameworkium.core.ui.capture.ScreenshotCapture;
-import com.frameworkium.core.ui.driver.*;
-import com.frameworkium.core.ui.listeners.*;
+import com.frameworkium.core.ui.driver.Driver;
+import com.frameworkium.core.ui.driver.DriverSetup;
+import com.frameworkium.core.ui.driver.WebDriverWrapper;
+import com.frameworkium.core.ui.listeners.CaptureListener;
+import com.frameworkium.core.ui.listeners.SauceLabsListener;
+import com.frameworkium.core.ui.listeners.ScreenshotListener;
 import com.saucelabs.common.SauceOnDemandAuthentication;
 import com.saucelabs.common.SauceOnDemandSessionIdProvider;
 import com.saucelabs.testng.SauceOnDemandAuthenticationProvider;
 import org.apache.commons.lang.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.openqa.selenium.*;
 import org.openqa.selenium.NoSuchElementException;
+import org.openqa.selenium.StaleElementReferenceException;
+import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.remote.SessionId;
 import org.openqa.selenium.support.ui.FluentWait;
 import org.openqa.selenium.support.ui.Wait;
 import org.testng.annotations.*;
 
 import java.lang.reflect.Method;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static java.util.Objects.isNull;
 
@@ -42,6 +53,7 @@ public abstract class BaseTest
     private static ThreadLocal<ScreenshotCapture> capture;
     private static ThreadLocal<Driver> driver;
     private static ThreadLocal<Wait<WebDriver>> wait;
+    private static ThreadLocal<Boolean> resetDriver;
     private static List<Driver> activeDrivers =
             Collections.synchronizedList(new ArrayList<>());
     private static String userAgent;
@@ -65,6 +77,7 @@ public abstract class BaseTest
             return newDriver;
         });
         wait = ThreadLocal.withInitial(BaseTest::newDefaultWait);
+        resetDriver = ThreadLocal.withInitial(() -> false);
         capture = ThreadLocal.withInitial(() -> null);
     }
 
@@ -82,13 +95,30 @@ public abstract class BaseTest
     @BeforeMethod(alwaysRun = true)
     public static void configureBrowserBeforeTest(Method testMethod) {
         try {
-            driver.get().resetBrowser();
             wait.set(newDefaultWait());
             userAgent = determineUserAgent();
             initialiseNewScreenshotCapture(testMethod);
         } catch (Exception e) {
             logger.error("Failed to configure browser.", e);
             throw new RuntimeException("Failed to configure browser.", e);
+        }
+    }
+
+    /**
+     * This method resets the browser after the test.
+     *
+     * Default implementation:
+     * <ul>
+     *     <li>Tear down the browser after test method</li>
+     *     <li>Re-create the browser after tear down</li>
+     * </ul>
+     */
+    @AfterMethod
+    public static void resetBrowserAfterTest() {
+        if (resetDriver.get()) {
+            driver.get().resetBrowser();
+        } else {
+            resetDriver.set(true);
         }
     }
 
@@ -140,7 +170,6 @@ public abstract class BaseTest
     public static WebDriverWrapper getDriver() {
         return driver.get().getDriver();
     }
-
 
     /** Loops through all active driver types and tears them down */
     @AfterSuite(alwaysRun = true)

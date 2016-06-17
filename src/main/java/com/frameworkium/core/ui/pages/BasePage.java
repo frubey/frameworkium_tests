@@ -13,16 +13,17 @@ import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.support.ui.Wait;
 import ru.yandex.qatools.htmlelements.loader.HtmlElementLoader;
 
-import java.util.Objects;
-
 public abstract class BasePage<T extends BasePage<T>> {
 
     protected final Logger logger = LogManager.getLogger(this);
     protected final WebDriver driver;
     protected Wait<WebDriver> wait;
     protected Visibility visibility;
+    protected JavascriptWait javascriptWait;
 
     private NgWebDriver ngDriver;
+
+    private int angularVersion;
 
     /** Constructor, initialises all things useful. */
     public BasePage() {
@@ -30,6 +31,7 @@ public abstract class BasePage<T extends BasePage<T>> {
         wait = BaseTest.getWait();
         visibility = new Visibility(wait, BaseTest.getDriver());
         ngDriver = new NgWebDriver(BaseTest.getDriver());
+        javascriptWait = new JavascriptWait(driver, wait);
     }
 
     /**
@@ -87,7 +89,7 @@ public abstract class BasePage<T extends BasePage<T>> {
      * <p>
      * <ul>
      * <li>Initialises fields with lazy proxies</li>
-     * <li>Waits for AngularJS requests to finish loading, if present</li>
+     * <li>Waits for Javascript events including document ready & Angular JS (if applicable)</li>
      * <li>Processes Frameworkium visibility annotations e.g. {@link Visible}</li>
      * <li>Log page load to Allure and Capture</li>
      * </ul>
@@ -98,14 +100,14 @@ public abstract class BasePage<T extends BasePage<T>> {
     @SuppressWarnings("unchecked")
     public T get() {
 
+        //Populate Page Object
         HtmlElementLoader.populatePageObject(this, driver);
 
-        // wait for page to load
-        if (isPageAngularJS()) {
-            waitForAngularRequestsToFinish();
-        }
+        //Wait for JS & Elements
+        javascriptWait.waitForJavascriptEvents();
         visibility.waitForAnnotatedElementVisibility(this);
-        // log page load
+
+        //Log
         takePageLoadedScreenshotAndSendToCapture();
         logPageLoadToAllure();
 
@@ -134,8 +136,11 @@ public abstract class BasePage<T extends BasePage<T>> {
         }
     }
 
-    private boolean isPageAngularJS() {
-        return Objects.equals(executeJS("return typeof angular;"), "object");
+    /**
+     * Waits for all angular requests to finish on page
+     */
+    protected void waitForAngularRequestsToFinish() {
+        javascriptWait.waitForAngularReady();
     }
 
     /**
@@ -178,11 +183,6 @@ public abstract class BasePage<T extends BasePage<T>> {
             logger.debug("Failed Javascript:" + javascript, e);
         }
         return returnObj;
-    }
-
-    /** Method to wait for AngularJS requests to finish on the page */
-    protected void waitForAngularRequestsToFinish() {
-        ngDriver.waitForAngularRequestsToFinish();
     }
 
     /** @return Returns the title of the web page */

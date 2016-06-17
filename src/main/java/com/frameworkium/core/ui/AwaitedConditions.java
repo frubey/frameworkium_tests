@@ -3,7 +3,6 @@ package com.frameworkium.core.ui;
 import org.openqa.selenium.*;
 import org.openqa.selenium.support.ui.ExpectedCondition;
 import org.openqa.selenium.support.ui.ExpectedConditions;
-import ru.yandex.qatools.htmlelements.element.TypifiedElement;
 
 import java.util.List;
 
@@ -95,4 +94,31 @@ public class AwaitedConditions {
                         : null;
     }
 
+    /**
+     * Wait for the document ready state to equal 'complete'.
+     * Useful for javascript loading on page-load.
+     *
+     * @return a {@link ExpectedCondition} which returns <strong>false</strong> if the document
+     * isn't ready, and <string>true</string> if the document is ready
+     */
+    public static ExpectedCondition<Boolean> documentBodyReady() {
+
+        return driver ->
+                (Boolean) ((JavascriptExecutor) driver)
+                        .executeScript("return document.readyState == 'complete';");
+    }
+
+    /**
+     * Wait for the first angular testability to be stable, as-in the angular webpage to be
+     * in a ready state.
+     *
+     * @return a {@link ExpectedCondition} which returns <strong>false</strong> if Angular 2
+     * isn't ready, and <string>true</string> if Angular 2 is ready
+     */
+    public static ExpectedCondition<Boolean> angularTwoReady() {
+
+        return driver ->
+                (Boolean) ((JavascriptExecutor) driver)
+                        .executeScript("return window.getAllAngularTestabilities()[0]._testability._isZoneStable;");
+    }
 }
